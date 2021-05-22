@@ -1,9 +1,11 @@
 from utils import urlsplit, get, post, get_cookie, save, loads
-from asyncio import get_event_loop, Semaphore, wait
+from asyncio import get_event_loop, Semaphore, wait, TimeoutError
 from os.path import dirname, exists
-from os import startfile, mkdir
+from os import startfile, mkdir, getcwd
 from config import Urls
-from time import sleep
+from logger import Logger
+
+logger = Logger()
 
 
 def is_mkdir(path):
@@ -24,8 +26,8 @@ async def login_in():
 
 
 class GetSPOCEVideo:
-    max_load = 2  # 并行数量
-    out_time = 5
+    max_load = 5  # 并行数量
+    timeout = None
 
     def __init__(self, url: str):
         self.url = url
@@ -33,7 +35,7 @@ class GetSPOCEVideo:
         self.headers = Urls.headers
         self.params = urlsplit(url)
         self.loop = get_event_loop()
-        self.save_path = dirname(__file__)
+        self.save_path = dirname(getcwd())
         self.semaphore = Semaphore(self.max_load)
         self.loop.run_until_complete(self.run())
 
@@ -41,17 +43,17 @@ class GetSPOCEVideo:
         """
         获取 queryChapterBytermId 中的数据
         """
+        print("\n下载路径:", self.save_path)
         data = loads(
             await get(Urls.queryChapterBytermId,
                       headers=self.headers,
                       params=self.params)
         )["data"]["chapterList"]
         await wait([self.loop.create_task(
-            self.get_subsection(i)) for i in data], timeout=None)
+            self.get_subsection(i)) for i in data], timeout=self.timeout)
 
     async def get_subsection(self, data: dict):
-        print("下载路径:", self.save_path)
-        path = is_mkdir(data["chapterName"]) if self.is_url else None
+        path = is_mkdir(data["chapterName"]) if not self.is_url else None
         params = {
             "chapterId": data["id"],
             **self.params
@@ -60,16 +62,16 @@ class GetSPOCEVideo:
             Urls.querySubsectionListByChapterId,
             headers=self.headers,
             params=params)
-            )["data"]["subsectionList"]
+                     )["data"]["subsectionList"]
 
         await wait([self.loop.create_task(
             self.get_video({**params, "subsectionId": i["id"]}, path)
-        ) for i in data], timeout=None)
+        ) for i in data], timeout=self.timeout)
 
-    async def get_video(self, data: dict, path: str = None):
+    async def get_video(self, data_params: dict, path: str = None):
         data = loads(await post(Urls.queryStudentTrianList, headers=self.headers, data={
-            "subsectionId": data["subsectionId"],
-            "chapterId": data["chapterId"]
+            "subsectionId": data_params["subsectionId"],
+            "chapterId": data_params["chapterId"]
         }))["data"]
 
         if self.is_url:
@@ -79,9 +81,15 @@ class GetSPOCEVideo:
             data = data["videoData"]
             file_name = data["name"]
             async with self.semaphore:
-                print("开始下载:", file_name)
-                await save(await get(data["videoList"][0]["value"]), f"{path}/{file_name}")
-                print("下载完成:", file_name, "\n所在目录:", path)
+                logger.download("开始下载:" + file_name)
+                try:
+                    await save(await get(data["videoList"][0]["value"]), f"{path}/{file_name}")
+                except TimeoutError:
+                    logger.timeout(file_name + "链接超时，正在尝试重新下载...")
+                    await self.get_video(data_params, path)
+                else:
+                    logger.completed("下载完成:" + file_name)
+                    logger.completed("所在目录:" + f"{self.save_path}\\{path}")
 
     async def login_select(self):
         cookie = None
@@ -121,12 +129,9 @@ class GetSPOCEVideo:
                     await self.get_chapter()
 
     def __del__(self):
-        if self.is_url:
-            input("按下回车(Enter)退出")
-        else:
-            print("%ss后自动退出" % self.out_time)
+        if not self.is_url:
             startfile(self.save_path)
-            sleep(self.out_time)
+        input("按下回车(Enter)退出")
 
 
 if __name__ == '__main__':
