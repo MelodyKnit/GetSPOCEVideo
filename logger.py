@@ -15,3 +15,8 @@ class Logger:
     @staticmethod
     def completed(msg: str):
         info("\033[32m[COMPLETED]: " + msg + "\033[m")
+
+
+__all__ = [
+    "Logger"
+]

@@ -20,9 +20,9 @@ async def post(url: str, **kwargs):
             return await reply.read()
 
 
-async def get_cookie(url: str, data: dict):
+async def get_cookie(url: str, data: dict, **kwargs):
     async with ClientSession() as session:
-        async with session.post(url, data=data) as reply:
+        async with session.post(url, data=data, **kwargs) as reply:
             data = loads(await reply.read())
             assert data["status"] != "error", data["message"]
             return str(reply.cookies.get("SESSION")).split(" ")[1]
@@ -31,3 +31,13 @@ async def get_cookie(url: str, data: dict):
 async def save(data: bytes, path: str):
     async with async_open(f"{path}", "wb") as file:
         await file.write(data)
+
+
+__all__ = [
+    "get",
+    "post",
+    "save",
+    "loads",
+    "urlsplit",
+    "get_cookie"
+]
