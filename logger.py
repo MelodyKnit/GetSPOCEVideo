@@ -1,20 +1,30 @@
-from logging import info, error, INFO, basicConfig
+from datetime import datetime
 
 
 class Logger:
-    basicConfig(level=INFO, format='\033[38;5;255m%(asctime)s %(message)s\033[m')
-
     @staticmethod
-    def download(msg: str):
-        info("\033[33m[DOWNLOAD]: " + msg + "\033[m")
+    def date():
+        return str(datetime.today()).split(".")[0]
 
-    @staticmethod
-    def timeout(msg: str):
-        error("\033[31m[TIMEOUT]: " + msg + "\033[m")
+    @classmethod
+    def print(cls, level: str, msg: str):
+        print(cls.date(), f"[{level.upper()}]:", msg)
 
-    @staticmethod
-    def completed(msg: str):
-        info("\033[32m[COMPLETED]: " + msg + "\033[m")
+    @classmethod
+    def download(cls, msg: str):
+        cls.print("download", msg)
+
+    @classmethod
+    def timeout(cls, msg: str):
+        cls.print("timeout", msg)
+
+    @classmethod
+    def completed(cls, msg: str):
+        cls.print("completed", msg)
+
+    @classmethod
+    def error(cls, msg: str):
+        cls.print("error", msg)
 
 
 __all__ = [

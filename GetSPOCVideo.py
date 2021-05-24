@@ -1,4 +1,4 @@
-from utils import urlsplit, get, post, get_cookie, save, loads
+from utils import urlsplit, get, post, get_cookie, save, loads, ServerDisconnectedError
 from asyncio import get_event_loop, Semaphore, wait, TimeoutError
 from os.path import dirname, exists
 from os import startfile, mkdir, getcwd
@@ -43,17 +43,19 @@ class GetSPOCEVideo:
         """
         获取 queryChapterBytermId 中的数据
         """
-        print("\n下载路径:", self.save_path)
-        data = loads(
-            await get(Urls.queryChapterBytermId,
-                      headers=self.headers,
-                      params=self.params)
-        )["data"]["chapterList"]
-        await wait([self.loop.create_task(
-            self.get_subsection(i)) for i in data], timeout=self.timeout)
+        try:
+            print("\n下载路径:", self.save_path)
+            data = loads(
+                await get(Urls.queryChapterBytermId,
+                          headers=self.headers,
+                          params=self.params)
+            )["data"]["chapterList"]
+            await wait([self.loop.create_task(
+                self.get_subsection(i)) for i in data], timeout=self.timeout)
+        except ServerDisconnectedError:
+            logger.error("Cookie值可能已失效，请重新登录！")
 
     async def get_subsection(self, data: dict):
-        path = is_mkdir(data["chapterName"]) if not self.is_url else None
         params = {
             "chapterId": data["id"],
             **self.params
@@ -65,7 +67,7 @@ class GetSPOCEVideo:
                      )["data"]["subsectionList"]
 
         await wait([self.loop.create_task(
-            self.get_video({**params, "subsectionId": i["id"]}, path)
+            self.get_video({**params, "subsectionId": i["id"]})
         ) for i in data], timeout=self.timeout)
 
     async def get_video(self, data_params: dict, path: str = None):
@@ -135,5 +137,5 @@ class GetSPOCEVideo:
 
 
 if __name__ == '__main__':
-    print("本程序爬取默认爬取最高画质视频，所以爬取速度可能会稍慢，还请耐心等待，如果觉得过慢或者出错可以选择生成视频链接通过其他软件下载！")
+    print("本程序爬取默认爬取最高画质视频，所以爬取速度可能会稍慢，还请耐心等待，如果觉得过慢或者出错可以选择生成视频链接通过其它软件下载！")
     GetSPOCEVideo(input("输入目录或视频链接>> "))

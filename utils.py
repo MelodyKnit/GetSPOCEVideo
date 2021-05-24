@@ -1,7 +1,7 @@
 from urllib import parse
 from json import loads
 from aiofile import async_open
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ServerDisconnectedError
 
 
 def urlsplit(url: str) -> dict:
@@ -39,5 +39,6 @@ __all__ = [
     "save",
     "loads",
     "urlsplit",
-    "get_cookie"
+    "get_cookie",
+    "ServerDisconnectedError"
 ]
